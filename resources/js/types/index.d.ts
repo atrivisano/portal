@@ -30,7 +30,15 @@ export interface User {
     name: string;
     email: string;
     avatar?: string;
+    avatarUrl?: string;
     email_verified_at: string | null;
+    phone?: string;
+    bio?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    zip_code?: string;
+    country?: string;
     created_at: string;
     updated_at: string;
 }

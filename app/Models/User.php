@@ -20,7 +20,14 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'profile_photo_path',
+        'avatar',
+        'phone',
+        'bio',
+        'address',
+        'city',
+        'state',
+        'zip_code',
+        'country',
     ];
 
     /**
@@ -47,14 +54,14 @@ class User extends Authenticatable
     }
 
     /**
-     * Get the default profile photo URL if no profile photo has been uploaded.
+     * Get avatar URL or generate default from initials
      *
      * @return string
      */
-    public function getProfilePhotoUrlAttribute()
+    public function getAvatarUrlAttribute()
     {
-        if ($this->profile_photo_path) {
-            return url('storage/' . $this->profile_photo_path);
+        if ($this->avatar) {
+            return url('storage/' . $this->avatar);
         }
 
         $name = trim(collect(explode(' ', $this->name))->map(function ($segment) {
