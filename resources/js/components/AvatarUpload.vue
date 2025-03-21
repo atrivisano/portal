@@ -1,34 +1,60 @@
 <script setup lang="ts">
 import { cn } from '@/lib/utils';
 import { useForm } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 // Components
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-
+import { Progress } from '@/components/ui/progress';
 import { useInitials } from '@/composables/useInitials';
-import { LoaderCircle, Upload, X } from 'lucide-vue-next';
+import { Camera, ImagePlus, RefreshCw, X } from 'lucide-vue-next';
 
 interface Props {
     userId: number;
     name: string;
-    avatarUrl?: string;
+    avatarUrl?: string | null;
     className?: string;
+    size?: 'sm' | 'md' | 'lg' | 'xl';
+    shape?: 'circle' | 'square';
 }
 
 const props = withDefaults(defineProps<Props>(), {
     className: '',
+    size: 'md',
+    shape: 'circle',
 });
 
 const { getInitials } = useInitials();
-const showErrorMessage = ref(false);
-const errorMessage = ref('');
 const dialogOpen = ref(false);
 const imagePreview = ref<string | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 const isLoading = ref(false);
+const uploadProgress = ref(0);
+const errorMessage = ref('');
+const showError = ref(false);
+const isImageCropped = ref(false);
+const imageCropperCanvas = ref<HTMLCanvasElement | null>(null);
+
+// Size class mapping
+const sizeClasses = {
+    sm: 'h-12 w-12',
+    md: 'h-20 w-20',
+    lg: 'h-28 w-28',
+    xl: 'h-36 w-36',
+};
+
+// Shape class mapping
+const shapeClasses = {
+    circle: 'rounded-full',
+    square: 'rounded-lg',
+};
+
+// Computed CSS classes for avatar
+const avatarClasses = computed(() => {
+    return cn(sizeClasses[props.size], shapeClasses[props.shape], 'overflow-hidden border bg-background', props.className);
+});
 
 // Create a form for uploading the avatar
 const form = useForm({
@@ -40,9 +66,20 @@ const form = useForm({
 const resetForm = () => {
     form.reset();
     imagePreview.value = null;
+    isImageCropped.value = false;
+    uploadProgress.value = 0;
     if (fileInput.value) {
         fileInput.value.value = '';
     }
+};
+
+// Show error message
+const showErrorMessage = (message: string) => {
+    errorMessage.value = message;
+    showError.value = true;
+    setTimeout(() => {
+        showError.value = false;
+    }, 5000);
 };
 
 // Handle file selection
@@ -54,16 +91,14 @@ const handleFileSelect = (event: Event) => {
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-        showErrorMessage.value = true;
-        errorMessage.value = 'Please select an image file.';
+        showErrorMessage('Please select an image file.');
         resetForm();
         return;
     }
 
-    // Validate file size (max 2MB)
-    if (file.size > 2 * 1024 * 1024) {
-        showErrorMessage.value = true;
-        errorMessage.value = 'Image size must be less than 2MB.';
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+        showErrorMessage('Image size must be less than 5MB.');
         resetForm();
         return;
     }
@@ -75,14 +110,29 @@ const handleFileSelect = (event: Event) => {
     const reader = new FileReader();
     reader.onload = (e) => {
         imagePreview.value = e.target?.result as string;
-        showErrorMessage.value = false;
+        showError.value = false;
     };
     reader.readAsDataURL(file);
 };
 
+// Simulate upload progress (for demo)
+const simulateProgress = () => {
+    uploadProgress.value = 0;
+    const interval = setInterval(() => {
+        uploadProgress.value += Math.random() * 10;
+        if (uploadProgress.value >= 100) {
+            uploadProgress.value = 100;
+            clearInterval(interval);
+        }
+    }, 200);
+};
+
 // Upload the avatar
 const uploadAvatar = () => {
+    if (!form.avatar) return;
+
     isLoading.value = true;
+    simulateProgress();
 
     form.post(route('profile.avatar.update'), {
         preserveScroll: true,
@@ -91,10 +141,13 @@ const uploadAvatar = () => {
             dialogOpen.value = false;
             resetForm();
         },
-        onError: () => {
+        onError: (errors) => {
             isLoading.value = false;
-            showErrorMessage.value = true;
-            errorMessage.value = 'Failed to upload avatar. Please try again.';
+            if (errors.avatar) {
+                showErrorMessage(errors.avatar);
+            } else {
+                showErrorMessage('Failed to upload avatar. Please try again.');
+            }
         },
     });
 };
@@ -102,6 +155,7 @@ const uploadAvatar = () => {
 // Remove the avatar
 const removeAvatar = () => {
     isLoading.value = true;
+    simulateProgress();
 
     useForm({
         _method: 'DELETE',
@@ -114,27 +168,52 @@ const removeAvatar = () => {
         },
         onError: () => {
             isLoading.value = false;
-            showErrorMessage.value = true;
-            errorMessage.value = 'Failed to remove avatar. Please try again.';
+            showErrorMessage('Failed to remove avatar. Please try again.');
         },
     });
 };
+
+// Emit event when dialog is closed
+const emit = defineEmits(['updated']);
+
+// Watch dialog open state
+watch(dialogOpen, (newValue) => {
+    if (!newValue) {
+        // Dialog was closed
+        emit('updated');
+    }
+});
 </script>
 
 <template>
     <Dialog v-model:open="dialogOpen">
         <DialogTrigger as-child>
-            <div :class="cn('group relative cursor-pointer rounded-lg', props.className)" aria-label="Change profile picture">
-                <Avatar :class="cn('h-20 w-20 overflow-hidden rounded-lg border bg-background', props.className)">
+            <div :class="cn('group relative cursor-pointer', props.className)" aria-label="Change profile picture">
+                <Avatar :class="avatarClasses">
                     <AvatarImage v-if="avatarUrl" :src="avatarUrl" :alt="name" />
-                    <AvatarFallback :class="cn('bg-muted text-lg font-medium text-foreground')">
+                    <AvatarFallback
+                        :class="
+                            cn(
+                                'flex items-center justify-center bg-muted text-foreground',
+                                props.size === 'sm' && 'text-sm',
+                                props.size === 'md' && 'text-lg',
+                                props.size === 'lg' && 'text-xl',
+                                props.size === 'xl' && 'text-2xl',
+                            )
+                        "
+                    >
                         {{ getInitials(name) }}
                     </AvatarFallback>
                 </Avatar>
                 <div
-                    class="absolute inset-0 flex h-full w-full items-center justify-center rounded-lg bg-black/40 opacity-0 transition-opacity group-hover:opacity-100"
+                    :class="
+                        cn(
+                            'absolute inset-0 flex h-full w-full items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100',
+                            shapeClasses[props.shape],
+                        )
+                    "
                 >
-                    <Upload class="h-6 w-6 text-white" />
+                    <Camera class="h-6 w-6 text-white" />
                 </div>
             </div>
         </DialogTrigger>
@@ -142,15 +221,15 @@ const removeAvatar = () => {
         <DialogContent class="sm:max-w-md">
             <DialogHeader>
                 <DialogTitle>Profile Picture</DialogTitle>
-                <DialogDescription> Upload a new profile picture or remove your current one. </DialogDescription>
+                <DialogDescription> Upload a new profile picture or remove your current one.</DialogDescription>
             </DialogHeader>
 
             <div class="grid gap-6 py-4">
                 <div class="flex flex-col items-center gap-4">
-                    <Avatar class="h-24 w-24 overflow-hidden rounded-lg border">
+                    <Avatar class="h-24 w-24 border-2">
                         <AvatarImage v-if="imagePreview" :src="imagePreview" :alt="name" class="object-cover" />
                         <AvatarImage v-else-if="avatarUrl" :src="avatarUrl" :alt="name" class="object-cover" />
-                        <AvatarFallback :class="cn('bg-muted text-xl font-medium text-foreground')">
+                        <AvatarFallback class="text-xl font-medium">
                             {{ getInitials(name) }}
                         </AvatarFallback>
                     </Avatar>
@@ -158,21 +237,25 @@ const removeAvatar = () => {
                     <div class="grid w-full gap-2">
                         <div class="flex gap-2">
                             <Button variant="secondary" class="flex-1 gap-2" @click="() => fileInput?.click()" :disabled="isLoading">
-                                <Upload class="h-4 w-4" />
+                                <ImagePlus class="h-4 w-4" />
                                 <span>Select image</span>
                                 <input ref="fileInput" type="file" class="hidden" accept="image/*" @change="handleFileSelect" />
                             </Button>
 
                             <Button v-if="avatarUrl || imagePreview" variant="destructive" size="icon" @click="removeAvatar" :disabled="isLoading">
                                 <X v-if="!isLoading" class="h-4 w-4" />
-                                <LoaderCircle v-else class="h-4 w-4 animate-spin" />
+                                <RefreshCw v-else class="h-4 w-4 animate-spin" />
                             </Button>
                         </div>
 
-                        <p v-if="showErrorMessage" class="text-sm text-destructive">
+                        <!-- Progress bar for uploading -->
+                        <Progress v-if="isLoading" :value="uploadProgress" class="h-2 w-full" />
+
+                        <!-- Error message -->
+                        <p v-if="showError" class="text-sm text-destructive">
                             {{ errorMessage }}
                         </p>
-                        <p v-else class="text-sm text-muted-foreground">Recommended: Square JPG, PNG, or GIF, 2MB maximum.</p>
+                        <p v-else class="text-sm text-muted-foreground">Square JPG, PNG, or GIF, 5MB maximum.</p>
                     </div>
                 </div>
             </div>
@@ -191,7 +274,7 @@ const removeAvatar = () => {
                     Cancel
                 </Button>
                 <Button variant="default" @click="uploadAvatar" :disabled="!form.avatar || isLoading">
-                    <LoaderCircle v-if="isLoading" class="mr-2 h-4 w-4 animate-spin" />
+                    <RefreshCw v-if="isLoading" class="mr-2 h-4 w-4 animate-spin" />
                     Save
                 </Button>
             </DialogFooter>
