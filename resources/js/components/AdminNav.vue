@@ -1,13 +1,7 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
+import { ChevronRight, LayoutDashboard, Settings, ShieldCheck, Users } from 'lucide-vue-next';
 import { computed } from 'vue';
-import {
-    Users,
-    ShieldCheck,
-    LayoutDashboard,
-    Settings,
-    UserCog
-} from 'lucide-vue-next';
 
 // Navigation items for admin panel
 const adminNavItems = [
@@ -15,26 +9,26 @@ const adminNavItems = [
         name: 'Dashboard',
         route: 'admin.dashboard',
         icon: LayoutDashboard,
-        permission: 'accessAdminDashboard'
+        permission: 'accessAdminDashboard',
     },
     {
         name: 'Users',
         route: 'admin.users.index',
         icon: Users,
-        permission: 'viewUsers'
+        permission: 'viewUsers',
     },
     {
         name: 'Roles',
         route: 'admin.roles.index',
         icon: ShieldCheck,
-        permission: 'viewRoles'
+        permission: 'viewRoles',
     },
     {
         name: 'Settings',
         route: 'admin.settings',
         icon: Settings,
-        permission: 'accessAdminDashboard'
-    }
+        permission: 'accessAdminDashboard',
+    },
 ];
 
 const page = usePage();
@@ -42,10 +36,11 @@ const page = usePage();
 // Filter navigation items based on user permissions
 const filteredNavItems = computed(() => {
     const userPermissions = page.props.auth.user.can;
+    const userRoles = page.props.auth.user.roles || [];
 
-    return adminNavItems.filter(item => {
+    return adminNavItems.filter((item) => {
         // Allow all items for super-admin
-        if (page.props.auth.user.roles.includes('super-admin')) {
+        if (userRoles.includes('super-admin')) {
             return true;
         }
 
@@ -56,23 +51,30 @@ const filteredNavItems = computed(() => {
 
 // Check if the current route matches the nav item
 const isCurrentRoute = (routeName: string) => {
-    const currentRoute = page.component.value as string;
-    const routeParts = currentRoute.split('/');
+    // Use page.url which gives the current URL path
+    const currentPath = page.url;
 
-    if (routeName === 'admin.dashboard' && routeParts[1] === 'admin' && !routeParts[2]) {
+    // Handle the case where currentPath might be undefined
+    if (!currentPath) return false;
+
+    // Remove any query parameters and split the path
+    const pathOnly = currentPath.split('?')[0];
+    const routeParts = pathOnly.split('/').filter(Boolean);
+
+    if (routeName === 'admin.dashboard' && routeParts[0] === 'admin' && !routeParts[1]) {
         return true;
     }
 
     // For nested routes like users.index, users.show, etc.
-    if (routeName.startsWith('admin.users') && routeParts[1] === 'admin' && routeParts[2] === 'users') {
+    if (routeName.startsWith('admin.users') && routeParts[0] === 'admin' && routeParts[1] === 'users') {
         return true;
     }
 
-    if (routeName.startsWith('admin.roles') && routeParts[1] === 'admin' && routeParts[2] === 'roles') {
+    if (routeName.startsWith('admin.roles') && routeParts[0] === 'admin' && routeParts[1] === 'roles') {
         return true;
     }
 
-    if (routeName.startsWith('admin.settings') && routeParts[1] === 'admin' && routeParts[2] === 'settings') {
+    if (routeName.startsWith('admin.settings') && routeParts[0] === 'admin' && routeParts[1] === 'settings') {
         return true;
     }
 
@@ -81,25 +83,40 @@ const isCurrentRoute = (routeName: string) => {
 </script>
 
 <template>
-    <div class="mb-6 border rounded-lg overflow-hidden">
-        <div class="flex items-center justify-between px-4 py-3 bg-muted/50">
+    <div class="mb-6 overflow-hidden rounded-lg border bg-card">
+        <div class="flex items-center justify-between border-b px-4 py-3">
             <h2 class="text-sm font-medium">Administration</h2>
         </div>
 
-        <nav class="flex overflow-x-auto">
+        <nav class="scrollbar-hide flex overflow-x-auto">
             <Link
                 v-for="item in filteredNavItems"
                 :key="item.name"
                 :href="route(item.route)"
-                class="inline-flex min-w-[100px] flex-col items-center justify-center px-4 py-3 text-sm transition-colors hover:bg-accent hover:text-accent-foreground sm:min-w-0 sm:flex-1 sm:flex-row sm:gap-2 sm:justify-start"
+                class="group flex min-w-[120px] flex-col items-center justify-center px-6 py-3 text-sm transition-colors hover:bg-accent hover:text-accent-foreground sm:min-w-0 sm:flex-1 sm:flex-row sm:justify-start sm:gap-3"
                 :class="{
-          'bg-accent/50 text-accent-foreground': isCurrentRoute(item.route),
-          'text-muted-foreground': !isCurrentRoute(item.route)
-        }"
+                    'bg-accent/50 text-accent-foreground': isCurrentRoute(item.route),
+                    'text-muted-foreground': !isCurrentRoute(item.route),
+                }"
             >
                 <component :is="item.icon" class="h-5 w-5 sm:h-4 sm:w-4" />
                 <span>{{ item.name }}</span>
+                <ChevronRight
+                    class="ml-auto hidden h-4 w-4 opacity-0 transition-opacity group-hover:opacity-70 sm:block"
+                    :class="{ 'opacity-70': isCurrentRoute(item.route) }"
+                />
             </Link>
         </nav>
     </div>
 </template>
+
+<style scoped>
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+</style>

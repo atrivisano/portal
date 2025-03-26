@@ -4,8 +4,8 @@ import { Calendar, CheckCircle2, Clock, Mail, MapPin, Phone, Shield, User } from
 import { onMounted, ref } from 'vue';
 
 // Components
-import EnhancedAvatarUpload from '@/components/AvatarUpload.vue';
 import DeleteUser from '@/components/DeleteUser.vue';
+import AvatarUpload from '@/components/AvatarUpload.vue';
 import InputError from '@/components/InputError.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +40,8 @@ const user = page.props.auth.user as User;
 const activeTab = ref('profile');
 const showSuccessMessage = ref(false);
 const successMessage = ref('');
+
+console.log(user);
 
 // Set initial success message if provided
 onMounted(() => {
@@ -138,7 +140,7 @@ const handleAvatarUpdate = () => {
                                 <div class="flex flex-col items-start gap-6 sm:flex-row">
                                     <!-- Avatar Section -->
                                     <div class="flex w-full flex-col items-center gap-2 sm:w-auto">
-                                        <EnhancedAvatarUpload
+                                        <AvatarUpload
                                             :user-id="user.id"
                                             :name="user.name"
                                             :avatar-url="user.avatar"
@@ -297,7 +299,7 @@ const handleAvatarUpdate = () => {
                                     <Shield class="h-5 w-5" />
                                     Account Information
                                 </CardTitle>
-                                <CardDescription> View your account details and verification status</CardDescription>
+                                <CardDescription> View your account details and verification status </CardDescription>
                             </CardHeader>
 
                             <CardContent>
@@ -379,7 +381,7 @@ const handleAvatarUpdate = () => {
                                             <h4 class="text-sm font-medium">Password</h4>
                                             <p class="text-sm text-muted-foreground">Update your password regularly for security</p>
                                             <Button variant="outline" size="sm" as-child class="mt-2">
-                                                <Link :href="route('password.edit')"> Change password</Link>
+                                                <Link :href="route('password.edit')"> Change password </Link>
                                             </Button>
                                         </div>
                                     </div>

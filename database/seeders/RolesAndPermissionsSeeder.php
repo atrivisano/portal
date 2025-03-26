@@ -2,13 +2,11 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Role;
-use Spatie\Permission\Models\Permission;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
-use Spatie\Permission\PermissionRegistrar;
 use App\Models\User;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Database\Seeder;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class RolesAndPermissionsSeeder extends Seeder
 {
@@ -20,43 +18,48 @@ class RolesAndPermissionsSeeder extends Seeder
         // Reset cached roles and permissions
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
-        // Create permissions
-        $permissions = [
-            // User management
-            'view users',
-            'create users',
-            'edit users',
-            'delete users',
-
-            // Role management
-            'view roles',
-            'create roles',
-            'edit roles',
-            'delete roles',
-
-            // Profile management
-            'view profile',
-            'edit profile',
-
-            // Permission management
-            'view permissions',
-            'assign permissions',
-
-            // Admin dashboard
-            'access admin dashboard',
+        // Create permissions grouped by module
+        $permissionGroups = [
+            'users' => [
+                'view users',
+                'create users',
+                'edit users',
+                'delete users',
+            ],
+            'roles' => [
+                'view roles',
+                'create roles',
+                'edit roles',
+                'delete roles',
+            ],
+            'permissions' => [
+                'view permissions',
+                'assign permissions',
+            ],
+            'profile' => [
+                'view profile',
+                'edit profile',
+            ],
+            'admin' => [
+                'access admin dashboard',
+                'view system logs',
+                'view system settings',
+                'edit system settings',
+            ],
         ];
 
+        // Flatten permissions for creation
+        $permissions = collect($permissionGroups)->flatten()->toArray();
+
+        // Create all permissions
         foreach ($permissions as $permission) {
             Permission::create(['name' => $permission]);
         }
 
-        // Create roles and assign permissions
-
-        // Super Admin role
+        // Create super-admin role and assign no permissions (will use Gate::before)
         $superAdminRole = Role::create(['name' => 'super-admin']);
-        // Super admin gets all permissions automatically via Gate::before rule
 
-        // Admin role
+        // Create admin role with specific permissions
         $adminRole = Role::create(['name' => 'admin']);
         $adminRole->givePermissionTo([
             'view users',
@@ -68,52 +71,41 @@ class RolesAndPermissionsSeeder extends Seeder
             'view profile',
             'edit profile',
             'access admin dashboard',
+            'view system logs',
+            'view system settings',
         ]);
 
-        // Volunteer role
+        // Create volunteer role with limited permissions
         $volunteerRole = Role::create(['name' => 'volunteer']);
         $volunteerRole->givePermissionTo([
             'view profile',
             'edit profile',
         ]);
 
-        // Create a super-admin user if it doesn't exist
-        $superAdmin = User::firstOrCreate(
-            ['email' => 'superadmin@example.com'],
-            [
-                'name' => 'Super Admin',
-                'email' => 'superadmin@example.com',
-                'password' => Hash::make('password'),
-                'email_verified_at' => now(),
-            ]
-        );
-
+        // Create super admin user
+        $superAdmin = User::factory()->superAdmin()->create();
         $superAdmin->assignRole('super-admin');
 
-        // Create an admin user if it doesn't exist
-        $admin = User::firstOrCreate(
-            ['email' => 'admin@example.com'],
-            [
-                'name' => 'Admin User',
-                'email' => 'admin@example.com',
-                'password' => Hash::make('password'),
-                'email_verified_at' => now(),
-            ]
-        );
-
+        // Create admin user
+        $admin = User::factory()->admin()->create();
         $admin->assignRole('admin');
 
-        // Create a volunteer user if it doesn't exist
-        $volunteer = User::firstOrCreate(
-            ['email' => 'volunteer@example.com'],
-            [
-                'name' => 'Volunteer User',
-                'email' => 'volunteer@example.com',
-                'password' => Hash::make('password'),
-                'email_verified_at' => now(),
-            ]
-        );
-
+        // Create volunteer user
+        $volunteer = User::factory()->volunteer()->create();
         $volunteer->assignRole('volunteer');
+
+        // Create some random users with roles
+        User::factory()->count(5)->create()->each(function ($user) {
+            $user->assignRole('volunteer');
+        });
+
+        // Create some pending approval users
+        User::factory()
+            ->count(3)
+            ->pendingApproval()
+            ->create()
+            ->each(function ($user) {
+                $user->assignRole('volunteer');
+            });
     }
 }

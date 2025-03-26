@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
-use Spatie\Permission\Traits\HasRoles;
-use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
@@ -28,6 +28,7 @@ class User extends Authenticatable
         'state',
         'zip_code',
         'country',
+        'is_approved',
     ];
 
     /**
@@ -49,7 +50,8 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'password'          => 'hashed',
+            'is_approved'       => 'boolean',
         ];
     }
 
@@ -69,5 +71,51 @@ class User extends Authenticatable
         })->join(' '));
 
         return 'https://ui-avatars.com/api/?name=' . urlencode($name) . '&color=7F9CF5&background=EBF4FF';
+    }
+
+    /**
+     * Check if user has completed their profile
+     *
+     * @return bool
+     */
+    public function getHasCompletedProfileAttribute()
+    {
+        return !empty($this->phone) &&
+            !empty($this->bio) &&
+            !empty($this->address) &&
+            !empty($this->city) &&
+            !empty($this->state) &&
+            !empty($this->zip_code) &&
+            !empty($this->country);
+    }
+
+    /**
+     * Check if user is super admin
+     *
+     * @return bool
+     */
+    public function getIsSuperAdminAttribute()
+    {
+        return $this->hasRole('super-admin');
+    }
+
+    /**
+     * Check if user is admin
+     *
+     * @return bool
+     */
+    public function getIsAdminAttribute()
+    {
+        return $this->hasRole('admin');
+    }
+
+    /**
+     * Check if user is volunteer
+     *
+     * @return bool
+     */
+    public function getIsVolunteerAttribute()
+    {
+        return $this->hasRole('volunteer');
     }
 }
